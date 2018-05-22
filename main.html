@@ -1,0 +1,41 @@
+<html>
+  <body>
+    <button>ON AIR</button>	  
+    <script>		       
+        var chunks = [];
+	var btn = document.querySelector("button");
+	var clicked = false;
+
+        var onFailSoHard = function(e) {
+    	console.log('Reject', e);
+        };
+        
+        navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+        navigator.getUserMedia({video:false,audio:true},  
+		                   function( localMediaStream) {
+                                     //var video = document.querySelector('video');        
+                                     var audio = document.querySelector('audio');
+				     audioRecorder = new MediaRecorder(localMediaStream);
+				     audioRecorder.ondataavailable = function(sample) {
+					           chunks.push(sample.data);
+						       }
+				     btn.addEventListener("click", function(e) {
+				     });	     
+				     if (!clicked) {
+					audioRecorder.start();
+				        clicked = true;
+				        console.log("started");
+				        //visualize(audioRecorder);
+			             } else {
+					     if(audioRecorder.state="recording") {   
+			                       audioRecorder.stop();
+                                               e.target.disabled = true;
+					     {
+			             }
+                                   }, 
+				   onFailSoHard );	      
+      
+      
+    </script>
+  </body>
+</html>
