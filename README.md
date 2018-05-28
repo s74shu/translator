@@ -1,6 +1,7 @@
 # translator
 
 Setup server side on ubuntu
+
 1 Install ffmpeg
 
 2 install node && npm https://tecadmin.net/install-latest-nodejs-npm-on-ubuntu/
