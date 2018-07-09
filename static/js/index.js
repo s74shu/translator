@@ -20,8 +20,7 @@
 var ws = new WebSocket('wss://' + window.location.host + '/mbs');
 var msclient = new WebSocket('wss://' + window.location.host + '/mbsmedia');
 msclient.binaryType = 'arraybuffer';
-//var ws_media = new WebSocket('wss://' + location.host + '/mbsmedia');
-//    ws_media.binaryType = 'blob'; //arraybuffer|blob
+
 var state = null;
 var ipFromHtml = "127.0.0.1";
 var btn
@@ -76,7 +75,53 @@ ws.onmessage = function (message) {
 //}
 
 msclient.addEventListener('open', function (event) {
-//    window.Stream = msclient.createStream();
+      consol.log('msclient open');
+      function convertFloat32ToInt16(buffer) {
+        l = buffer.length;
+        buf = new Int16Array(l);
+        while (l--) {
+           buf[l] = Math.min(1, buffer[l])*0x7FFF;
+        }
+        return buf.buffer;
+      }   
+      navigator.getUserMedia = navigator.getUserMedia || 
+                             navigator.webkitGetUserMedia || 
+                             navigator.mozGetUserMedia || 
+                             navigator.msGetUserMedia;
+      navigator.mediaDevices.getUserMedia( {"audio":true} )
+            .then( function(stream) {
+                       var lclAContext = window.AudioContext;
+                       var acontext = new lclAContext();
+                       var audioInput = acontext.createMediaStreamSource(stream);
+                       var bufferSize = 2048;       
+                       var recorder = acontext.createScriptProcessor(bufferSize, 1, 1);
+                       recorder.onaudioprocess = recorderProcess;
+                       audioInput.connect(recorder);
+                       recorder.connect(acontext.destination);
+                       function recorderProcess(ev) {
+                           var left = ev.inputBuffer.getChannelData(0);
+                           //var data = convertFloat32ToInt16(left);
+                           consol.log(left[0],left[1]);
+                           
+                           //if ( left[0] >= 0){
+                           consol.log(left.length);
+                           //}else{
+                           // consol.log((~left[0]).toString(16));
+                           //}
+                           //if ( left[1] >= 0){
+                           // consol.log(left[1].toString(16));
+                           //}else{
+                           // consol.log((~left[1]).toString(16));
+                          // }
+                           
+                           msclient.send(left);
+                           
+                       } 
+      }) 
+           .catch( function (err){
+           window.console.log('failed '+ err.message);
+      }); // navigator.
+        
 });
 
 
@@ -99,7 +144,6 @@ function hlsplayer() {
 }
 
 function captureLclMedia() {
-    var chunks = [];
     btn = document.querySelector("button");
     var txtFld = document.querySelector("input");
     defBtnColor = btn.style.backgroundColor;
@@ -108,19 +152,7 @@ function captureLclMedia() {
     var clicked = false;
     
 
-    function convertFloat32ToInt16(buffer) {
-        l = buffer.length;
-        buf = new Int16Array(l);
-        while (l--) {
-           buf[l] = Math.min(1, buffer[l])*0x7FFF;
-        }
-        return buf.buffer;
-    }
 
-    navigator.getUserMedia = navigator.getUserMedia || 
-                             navigator.webkitGetUserMedia || 
-                             navigator.mozGetUserMedia || 
-                             navigator.msGetUserMedia;
     //var signalingChannel = createSignalingChannel();
 //    srv = new RTCPeerConnection();
 //    srv.onaddstream = function (evt) {
@@ -129,26 +161,6 @@ function captureLclMedia() {
 //    srv.ontrack = function() {
 //        consol.log('ontrack');
 //    }
-    navigator.mediaDevices.getUserMedia( {"audio":true} )
-            .then( function(stream) {
-                       var lclAContext = window.AudioContext;
-                       var acontext = new lclAContext();
-                       var audioInput = acontext.createMediaStreamSource(stream);
-                       var bufferSize = 2048;       
-                       var recorder = acontext.createScriptProcessor(bufferSize, 1, 1);
-                       recorder.onaudioprocess = recorderProcess;
-                       audioInput.connect(recorder);
-                       recorder.connect(acontext.destination);
-                       function recorderProcess(ev) {
-                           var left = ev.inputBuffer.getChannelData(0);                      
-                           msclient.send(convertFloat32ToInt16(left));
-                           //window.Streamwrite(left);
-                       } 
-        }) 
-           .catch( function (err){
-           window.console.log('failed '+ err.message);
-        });
-   // navigator.
 
 
   

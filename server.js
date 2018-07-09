@@ -7,8 +7,11 @@ var cookieParser = require('cookie-parser')
 var express = require('express');
 var session = require('express-session')
 var minimist = require('minimist');
+var binaryServer = require('binaryjs').BinaryServer;
 var ws = require('ws');
 var fs = require('fs');
+var wav = require('wav');
+var http = require('http');
 var https = require('https');
 var childProcess = require('child_process');
 var spawn = childProcess.spawn;
@@ -42,7 +45,9 @@ var sessions = {};
  * Server startup
  */
 
+//var bserver = binaryServer({port: 8000});
 var mwss = new ws.Server({ noServer: true });
+mwss.binaryType = "arrayBuffer";
 var wss = new ws.Server({ noServer: true });
 var port = '8443';
 //asUrl = 'https://localhost:8443/';
@@ -66,6 +71,7 @@ server.on('upgrade', function upgrade(request, socket, head) {
     socket.destroy();
   }
 });
+
 
 
 /*var mwss = new ws.Server({
@@ -148,10 +154,13 @@ wss.on('connection', function connection(ws, req) {
 });//////////////
 */
 var ffchild;
+var wavstr;
+var wavf;
 
 mwss.on('connection', function connection(ws, req) {
   
     console.log('mwss connection');
+     
 //    ws.upgradeReq = req;
 //    var location = url.parse(ws.upgradeReq.url, true);
 
@@ -172,9 +181,16 @@ mwss.on('connection', function connection(ws, req) {
 //       } else {
 //         console.log('fail to create fifo with code:  ' + code);
 //      }
-//    });  
-    ffchild = spawn('ffprobe',['-hide_banner','-i','pipe:0']);
+//    });
+    //wavstr = new wav.Writer({channels:1,sampleRate:48000,bitDepth:16});  
+//    wavf = new wav.FileWriter('out.wav',{channels:1,sampleRate:48000,bitDepth:16});  
+    ffchild = spawn('ffmpeg',['-y','-hide_banner',
+                                '-f',
+                                'f32le',
+                                '-ac','1','-ar','48000','-i','pipe:0',
+                                'out.wav']);
        //         ffchild.stdin.write(arrayBuffer);
+    ffchild.stdin.setEncoding = 'binary';
     ffchild.stdout.on('data', function (data) {
                  console.log('stdout: ' + data);
     });
@@ -199,20 +215,36 @@ mwss.on('connection', function connection(ws, req) {
               });///
 */
     ws.on('error', function (error) {
-        console.log('Connection M' + sessionId + ' error');
+        console.log('Connection M' + /*sessionId + */' error');
+        ffchild.stdin.end();
+        //wavf.end();
         //stop(sessionId);
     });
 
     ws.on('close', function () {
-        console.log('Connection M' + sessionId + ' closed');
+        console.log('Connection M'/* + sessionId  */+' closed');
+        ffchild.stdin.end();
         //stop(sessionId);
+        //wavf.end();
     });
 
     ws.on('message', function (message) {
+        var a = Buffer.from(message);
+        //wavf.write(message.binaryData);
+        //for(var i = 0; i < a.length ;i++){
+        console.log(a.readFloatLE(0), a.readFloatLE(4));
+          
+          
+        //}
+        //ffchild.stdin.write(a); 
+        console.log(a.length);   
+        //console.log(a[0],a[1]);  
+        //console.log(message.getInt16());
+//        console.log(message[1]); 
         //message.pipe(ffchild.stdin);
-        //ffchild.stdin.write(message.data); 
+        ffchild.stdin.write(a); 
         console.log('receive message');
-
+        //console.log(message);
                 
   });
 });//////////////
