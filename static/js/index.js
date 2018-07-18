@@ -104,7 +104,7 @@ msclient.addEventListener('open', function (event) {
                            consol.log(left[0],left[1]);
                            
                            //if ( left[0] >= 0){
-                           consol.log(left.length);
+                           //consol.log(left.length);
                            //}else{
                            // consol.log((~left[0]).toString(16));
                            //}
@@ -130,6 +130,7 @@ function hlsplayer() {
     if(Hls.isSupported()) {
         var hls = new Hls();
         hls.loadSource('https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8');
+        //inVideo.src = 'http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8';
         hls.attachMedia(inVideo);
         videoInput = inVideo;
         hls.on(Hls.Events.MANIFEST_PARSED,function() {
@@ -137,6 +138,7 @@ function hlsplayer() {
     }
     else if (inVideo.canPlayType('application/vnd.apple.mpegurl')) {
         inVideo.src = 'https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8';
+        //inVideo.src = 'http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8';
         inVideo.addEventListener('loadedmetadata',function() {
 //                                                 inVideo.play();
                                                            });

@@ -7,10 +7,8 @@ var cookieParser = require('cookie-parser')
 var express = require('express');
 var session = require('express-session')
 var minimist = require('minimist');
-var binaryServer = require('binaryjs').BinaryServer;
 var ws = require('ws');
 var fs = require('fs');
-var wav = require('wav');
 var http = require('http');
 var https = require('https');
 var childProcess = require('child_process');
@@ -184,11 +182,44 @@ mwss.on('connection', function connection(ws, req) {
 //    });
     //wavstr = new wav.Writer({channels:1,sampleRate:48000,bitDepth:16});  
 //    wavf = new wav.FileWriter('out.wav',{channels:1,sampleRate:48000,bitDepth:16});  
-    ffchild = spawn('ffmpeg',['-y','-hide_banner',
-                                '-f',
-                                'f32le',
+    ffchild = spawn('ffmpeg',['-hide_banner', '-thread_queue_size', '512', '-re', '-y',
+                                '-f','f32le',
                                 '-ac','1','-ar','48000','-i','pipe:0',
-                                'out.wav']);
+                                //'-i','http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8',
+                                '-i', 'https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8',
+                                '-map', '0:a:0',
+                                '-map', '1:a:0',
+                                '-map', '1:v:0',
+                                '-map', '1:a:1',
+                                '-map', '1:v:1',
+                                '-map', '1:a:2',
+                                '-map', '1:v:2',
+                                '-map', '1:a:3',
+                                '-map', '1:v:3',
+ 
+                                '-c:a:0','aac', '-strict','-2', '-b:a:0','192k',
+                                '-c:a:1','copy',
+                                '-c:a:2','copy',
+                                '-c:a:3','copy',
+                                '-c:a:4','copy',
+                                '-c:v','copy',
+                              /*  '-filter_complex', '"[0:a:0][1:a:0] amerge=inputs=2[a]"',
+                                '-map', '0:1', '-map', '[a]', '-ar', '44100', '-ab', '70k', '-ac', '2', 
+                                '-c:v', 'copy', i*/
+                                //'-c:a', 'aac', '-strict', '-2', '-b:a','192k',  
+                                
+                                '-flags', '+global_header',
+                                //'-f','hls','-hls_segment_filename', '-var_stream_map', '"a:0 a:1,v:1"',
+                                //'/HLS/live/str_%v.ts',
+                                //'/HLS/live/out_%v.m3u8'
+                                '-f', 'ssegment', 
+                                '-segment_list_size', '3', 
+                                //'-hls_wrap', '4', '-hls_flags', 'delete_segments',
+                                '-segment_start_number', '1',
+                                '-segment_list_flags', '+live', '-segment_time', '10',
+                                '-segment_list', '/HLS/live/playlist.m3u8',
+                                '/HLS/live/0ut%03d.ts' 
+                                /*'out.wav'*/]);
        //         ffchild.stdin.write(arrayBuffer);
     ffchild.stdin.setEncoding = 'binary';
     ffchild.stdout.on('data', function (data) {
@@ -232,18 +263,18 @@ mwss.on('connection', function connection(ws, req) {
         var a = Buffer.from(message);
         //wavf.write(message.binaryData);
         //for(var i = 0; i < a.length ;i++){
-        console.log(a.readFloatLE(0), a.readFloatLE(4));
+        //console.log(a.readFloatLE(0), a.readFloatLE(4));
           
           
         //}
         //ffchild.stdin.write(a); 
-        console.log(a.length);   
+        //console.log(a.length);   
         //console.log(a[0],a[1]);  
         //console.log(message.getInt16());
 //        console.log(message[1]); 
         //message.pipe(ffchild.stdin);
         ffchild.stdin.write(a); 
-        console.log('receive message');
+        //console.log('receive message');
         //console.log(message);
                 
   });
