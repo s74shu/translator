@@ -21,8 +21,10 @@ var FileAPI = require('file-api')
   ;
 var options =
     {
-        key: fs.readFileSync('keys/server.key'),
-        cert: fs.readFileSync('keys/server.crt')
+        //key: fs.readFileSync('keys/server.key'),
+        //cert: fs.readFileSync('keys/server.crt')
+        key: fs.readFileSync('keys/domain.key'),
+        cert: fs.readFileSync('keys/domain.crt')
     };
 const app = express(); 
 
@@ -38,6 +40,7 @@ var session_index = 0;
  * Definition of global variables.
  */
 var sessions = {};
+var streamurl = new url.URL('https://localhost');
 //var candidatesQueue = {};
 /*
  * Server startup
@@ -97,8 +100,8 @@ mserver.on('error', function(err){
     console.log(err.message);
                     });
 mserver.listen(8000); 
+*/
 
-/*
 wss.on('connection', function connection(ws, req) {
     console.log('wss connect');
     ws.upgradeReq = req;
@@ -134,6 +137,38 @@ wss.on('connection', function connection(ws, req) {
                 break;
             case 'mdata':
                 break;
+            case 'streamurl':
+                var strmUrl = url.parse(message.streamurl);         
+                var output = '';
+                var outerr = '';       
+                console.log('Receive url ',strmUrl.href);
+                ffprbproc = spawn('ffprobe',['-hide_banner',
+                                 '-loglevel', '16',
+                                 '-show_streams',
+                                 '-of', 'json',
+                                 strmUrl.href]
+                );
+                
+                ffprbproc.on('close', function(code){
+                    var message;
+                    if(code == 0)
+                        ws.send(JSON.stringify({
+                             id: 'ffprobe_result',
+                             message: output
+                        }));
+                    else
+                        ws.send(JSON.stringify({
+                             id: 'ffprobe_error',
+                             message: outerr
+                        }));
+                });
+                ffprbproc.stdout.on('data', function(data) {
+                    output = output+data;
+                });
+                ffprbproc.stderr.on('data', function(data) {
+                    outerr = outerr+data;
+                });
+                break;
             case 'start':
                 sessionId = request.session.id;
             
@@ -149,8 +184,8 @@ wss.on('connection', function connection(ws, req) {
                 break;
         }  
    });
-});//////////////
-*/
+});// wss kernel
+
 var ffchild;
 var wavstr;
 var wavf;
@@ -223,11 +258,11 @@ mwss.on('connection', function connection(ws, req) {
        //         ffchild.stdin.write(arrayBuffer);
     ffchild.stdin.setEncoding = 'binary';
     ffchild.stdout.on('data', function (data) {
-                 console.log('stdout: ' + data);
+//                 console.log('stdout: ' + data);
     });
 
     ffchild.stderr.on('data', function (data) {
-                 console.log('stderr: ' + data);
+//                 console.log('stderr: ' + data);
     });
 /*                var ffchild = spawn('ffmpeg',['-re',
                                               'hide_bunner',
@@ -286,6 +321,26 @@ function start(sessionId, ws, sdpOffer, callback) {
         return callback('Cannot use undefined sessionId');
     }
 
+}
+
+function parse_stream(href) {
+    ffprbproc = spawn('ffprobe',['-hide_banner',
+                                 '-loglevel', '16',
+                                 '-show_streams',
+                                 '-of', 'json',
+                                 href]
+                      );
+    ffprbproc.on('close', function(code){
+        console.log('code '+code);
+    });
+    /*ffprbproc.stdout.on('data', function (data) {
+        console.log(' '+data);
+        //var joutput = JSON.parse(data);
+        //console.log('json',joutput);
+    });
+    ffprbproc.stderr.on('data', function (data) {
+        console.log('ffprobe stderr '+data);
+    });*/
 }
 
 app.use(express.static(path.join(__dirname, 'static')));

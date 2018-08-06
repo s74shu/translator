@@ -1,5 +1,4 @@
 /*
- * (C) Copyright 2014-2015 Kurento (http://kurento.org/)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +22,7 @@ msclient.binaryType = 'arraybuffer';
 
 var state = null;
 var ipFromHtml = "127.0.0.1";
-var btn
+var btn;
 var consol;
 
 const I_CAN_START = 0;
@@ -39,12 +38,12 @@ window.onload = function () {
 }
 
 window.onbeforeunload = function () {
-	//ws.close();
+	ws.close();
         msclient.close(); 
 }
 
 ws.onmessage = function (message) {
-/*	var parsedMessage = JSON.parse(message.data);
+	var parsedMessage = JSON.parse(message.data);
 	console.info('client Received message: ' + message.data);
 	switch (parsedMessage.id) {
 		case 'startResponse':
@@ -56,9 +55,28 @@ ws.onmessage = function (message) {
 			}
 			onError('Error message from server: ' + parsedMessage.message);
 			break;
-		case 'iceCandidate':
-			webRtcPeer.addIceCandidate(parsedMessage.candidate)
+		case 'ffprobe_result':
+                        jarray = JSON.parse(parsedMessage.message);
+                        var div = document.getElementById('streams');
+                        for( i = 0; i < jarray.streams.length; i++) {
+                            var p = document.createElement('p');
+                            var inp = document.createElement('input');
+                            inp.type = 'checkbox';
+                            label = jarray.streams[i].codec_type;
+                            if(label == 'video')
+                                label = label+" "+jarray.streams[i].width+'x'+jarray.streams[i].height;
+                            if(label == 'audio')
+                                label = label+' '+jarray.streams[i].sample_rate;
+                            inp.id = 'stream'+i;
+                            
+                            p.appendChild(inp);
+                            p.insertAdjacentHTML('beforeend', '<label for="stream'+i+'">  '+label+'</label>');
+                            div.appendChild(p);    
+                        }
 			break;
+                case 'ffprobe_error':
+                        consol.log(parsedMessage.message);
+                        break;
 		case 'ffmpeg':
 			console.log('From ffmpeg:', parsedMessage.message);
 			break;
@@ -67,7 +85,7 @@ ws.onmessage = function (message) {
 				setState(I_CAN_START);
 			}
 			onError('Unrecognized message', parsedMessage);
-	}*/
+	}
 }
 
 //ws_media.onmessage = function (message) {
@@ -75,7 +93,7 @@ ws.onmessage = function (message) {
 //}
 
 msclient.addEventListener('open', function (event) {
-      consol.log('msclient open');
+      //consol.log('msclient open');
       function convertFloat32ToInt16(buffer) {
         l = buffer.length;
         buf = new Int16Array(l);
@@ -101,7 +119,7 @@ msclient.addEventListener('open', function (event) {
                        function recorderProcess(ev) {
                            var left = ev.inputBuffer.getChannelData(0);
                            //var data = convertFloat32ToInt16(left);
-                           consol.log(left[0],left[1]);
+                           //consol.log(left[0],left[1]);
                            
                            //if ( left[0] >= 0){
                            //consol.log(left.length);
@@ -146,11 +164,13 @@ function hlsplayer() {
 }
 
 function captureLclMedia() {
-    btn = document.querySelector("button");
-    var txtFld = document.querySelector("input");
+    btn = document.getElementById("btnAir");
+    var urlBtn = document.getElementById("btnUrl");
+    var streamUrlFld = document.getElementById("strUrl");
+    var defBtnColor = btn.bgcolor;
     defBtnColor = btn.style.backgroundColor;
-    curBtnColor = defBtnColor; 
-    ipFromHtml = txtFld.value;
+    var curBtnColor = defBtnColor; 
+    //ipFromHtml = txtFld.value;
     var clicked = false;
     
 
@@ -203,6 +223,17 @@ function captureLclMedia() {
                              consol.log('Reject', e);
    };//onFailSoHard                            
    //navigator.getUserMedia({video:true,audio:true}, streamFunc, onFailSoHard ); 
+
+   urlBtn.addEventListener("click", function(e) {
+           var div = document.getElementById('streams');
+           div.innerHTML = '';
+           var message = {
+               id: 'streamurl',
+               streamurl: streamUrlFld.value
+           };
+       sendMessage(message); 
+   });
+
    btn.addEventListener("click", function(e) {
                                       if (!clicked) {
                                           clicked = true;
