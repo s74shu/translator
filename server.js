@@ -21,8 +21,6 @@ var FileAPI = require('file-api')
   ;
 var options =
     {
-        //key: fs.readFileSync('keys/server.key'),
-        //cert: fs.readFileSync('keys/server.crt')
         key: fs.readFileSync('keys/domain.key'),
         cert: fs.readFileSync('keys/domain.crt')
     };
@@ -40,21 +38,19 @@ var session_index = 0;
  * Definition of global variables.
  */
 var sessions = {};
-var streamurl = new url.URL('https://localhost');
-//var candidatesQueue = {};
+var ffchild;
+var streamurl = new url.URL('https://motorsporttv.pc.cdn.bitgravity.com/live/ExtContent/moto3/MotoHLS/moto3.m3u8');
+var channel = [];
 /*
  * Server startup
  */
 
-//var bserver = binaryServer({port: 8000});
 var mwss = new ws.Server({ noServer: true });
 mwss.binaryType = "arrayBuffer";
 var wss = new ws.Server({ noServer: true });
 var port = '8443';
-//asUrl = 'https://localhost:8443/';
 var server = https.createServer(options, app).listen(port, function () {
     console.log('MBS started');
-//    console.log('Open ' + url.format(asUrl) + ' with a WebRTC capable browser');
 });
 
 server.on('upgrade', function upgrade(request, socket, head) {
@@ -75,32 +71,6 @@ server.on('upgrade', function upgrade(request, socket, head) {
 
 
 
-/*var mwss = new ws.Server({
-    server: server,
-    path: '/mbsmedia'
-});
-var wss = new ws.Server({
-    server: server,
-    path: '/mbs'
-});
-
-
-var mserver = net.createServer( function(mediastream) {
-    console.log('client connected');
-    //mediastream.pipe(stdin);
-
-                  });
-mserver.on('data', function(){
-                       console.log('Received');
-});
-mserver.on('close', function(){
-    console.log('Connection closed');
-});
-mserver.on('error', function(err){
-    console.log(err.message);
-                    });
-mserver.listen(8000); 
-*/
 
 wss.on('connection', function connection(ws, req) {
     console.log('wss connect');
@@ -129,7 +99,6 @@ wss.on('connection', function connection(ws, req) {
     ws.on('message', function (_message) {
         var message = JSON.parse(_message);
         console.log('Connection ' + sessionId + ' received message ', message);
-        console.log(message.type);
 
         switch (message.id) {
             case 'sdp':
@@ -169,6 +138,17 @@ wss.on('connection', function connection(ws, req) {
                     outerr = outerr+data;
                 });
                 break;
+            case 'hls_stream'://configure url and hls maps for ffmpeg
+                streamurl = url.parse(message.streamurl).href;         
+                for (let ndx in message.streams) {
+                    if (message.streams[ndx] == true) 
+                        channel.push(ndx);
+                }
+                ws.send(JSON.stringify({
+                    id: 'hls_stream',
+                    message: 'configured'
+                }));
+                break;
             case 'start':
                 sessionId = request.session.id;
             
@@ -186,9 +166,6 @@ wss.on('connection', function connection(ws, req) {
    });
 });// wss kernel
 
-var ffchild;
-var wavstr;
-var wavf;
 
 mwss.on('connection', function connection(ws, req) {
   
@@ -199,30 +176,35 @@ mwss.on('connection', function connection(ws, req) {
 
 //    var cookies = cookie.parse(ws.upgradeReq.headers.cookie);
 
-//    var wstream = fs.createWriteStream("",{'encoding': 'binary'});
-
-//    var sessionId = null;
 //    var request = ws.upgradeReq;
 //    var response = {
 //        writeHead: {}
 //    };
-//    var fifoFilePath = 'mbs.pipe';
-//    var mkfifoProcess = spawn('mkfifo',  [fifoFilePath]);
-//    mkfifoProcess.on('exit', function (code) {
-//       if (code == 0) {
-//         console.log('fifo created: ' + fifoFilePath);
-//       } else {
-//         console.log('fail to create fifo with code:  ' + code);
-//      }
-//    });
-    //wavstr = new wav.Writer({channels:1,sampleRate:48000,bitDepth:16});  
-//    wavf = new wav.FileWriter('out.wav',{channels:1,sampleRate:48000,bitDepth:16});  
-    ffchild = spawn('ffmpeg',['-hide_banner', '-thread_queue_size', '512', '-re', '-y',
+    console.log(streamurl); 
+    var stream_options = ['-hide_banner', '-thread_queue_size', '512', '-re', '-y',
+                          '-f','f32le',
+                          '-ac','1','-ar','48000','-i','pipe:0',
+                          '-i', streamurl,
+                          '-map', '0:a:0','-c:a:0','aac', '-strict','-2', '-b:a:0','192k'
+                         ];
+    channel.forEach(function(itm) {
+                        stream_options.push('-map');stream_options.push('1:'+itm);
+                        stream_options.push('-c:1:'+itm);stream_options.push('copy');
+                    });
+                        stream_options.push('-flags');   stream_options.push('+global_header');
+                        stream_options.push('-f');       stream_options.push('hls');
+                        stream_options.push('-hls_time');stream_options.push('3'); 
+                        stream_options.push('-hls_wrap');stream_options.push('4');
+                        stream_options.push('-hls_segment_filename');stream_options.push('/HLS/live/0ut%02d.ts');
+                        stream_options.push('/HLS/live/playlist.m3u8');
+    console.log(stream_options);
+    ffchild = spawn('ffmpeg', stream_options );          
+/*    ffchild = spawn('ffmpeg',['-hide_banner', '-thread_queue_size', '512', '-re', '-y',
                                 '-f','f32le',
                                 '-ac','1','-ar','48000','-i','pipe:0',
-                                //'-i','http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8',
-                                '-i', 'https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8',
+                                '-i', streamurl,
                                 '-map', '0:a:0',
+                                '-c:a:0','aac', '-strict','-2', '-b:a:0','192k',
                                 '-map', '1:a:0',
                                 '-map', '1:v:0',
                                 '-map', '1:a:1',
@@ -232,37 +214,38 @@ mwss.on('connection', function connection(ws, req) {
                                 '-map', '1:a:3',
                                 '-map', '1:v:3',
  
-                                '-c:a:0','aac', '-strict','-2', '-b:a:0','192k',
                                 '-c:a:1','copy',
                                 '-c:a:2','copy',
                                 '-c:a:3','copy',
                                 '-c:a:4','copy',
                                 '-c:v','copy',
-                              /*  '-filter_complex', '"[0:a:0][1:a:0] amerge=inputs=2[a]"',
-                                '-map', '0:1', '-map', '[a]', '-ar', '44100', '-ab', '70k', '-ac', '2', 
-                                '-c:v', 'copy', i*/
+                              //  '-filter_complex', '"[0:a:0][1:a:0] amerge=inputs=2[a]"',
+                              //  '-map', '0:1', '-map', '[a]', '-ar', '44100', '-ab', '70k', '-ac', '2', 
+                              //  '-c:v', 'copy', i
                                 //'-c:a', 'aac', '-strict', '-2', '-b:a','192k',  
                                 
                                 '-flags', '+global_header',
                                 //'-f','hls','-hls_segment_filename', '-var_stream_map', '"a:0 a:1,v:1"',
                                 //'/HLS/live/str_%v.ts',
                                 //'/HLS/live/out_%v.m3u8'
-                                '-f', 'ssegment', 
-                                '-segment_list_size', '3', 
-                                //'-hls_wrap', '4', '-hls_flags', 'delete_segments',
-                                '-segment_start_number', '1',
-                                '-segment_list_flags', '+live', '-segment_time', '10',
-                                '-segment_list', '/HLS/live/playlist.m3u8',
-                                '/HLS/live/0ut%03d.ts' 
-                                /*'out.wav'*/]);
+                                '-f', 'hls', 
+                                '-hls_time', '3', '-hls_wrap', '4',
+                                // hls_wrap is a deprecated option, you can use hls_list_size and 
+                                // hls_flags delete_segments instead it. but in local version ffmpeg,
+                                // delete_segments not working
+                                //'-hls_list_size', '5', '-hls_flags', 'delete_segments',
+                               
+                                '-hls_segment_filename', '/HLS/live/0ut%02d.ts', 
+                                '/HLS/live/playlist.m3u8'
+                                ]);*/
        //         ffchild.stdin.write(arrayBuffer);
     ffchild.stdin.setEncoding = 'binary';
     ffchild.stdout.on('data', function (data) {
-//                 console.log('stdout: ' + data);
+                 console.log('stdout: ' + data);
     });
 
     ffchild.stderr.on('data', function (data) {
-//                 console.log('stderr: ' + data);
+                 console.log('stderr: ' + data);
     });
 /*                var ffchild = spawn('ffmpeg',['-re',
                                               'hide_bunner',
@@ -283,7 +266,6 @@ mwss.on('connection', function connection(ws, req) {
     ws.on('error', function (error) {
         console.log('Connection M' + /*sessionId + */' error');
         ffchild.stdin.end();
-        //wavf.end();
         //stop(sessionId);
     });
 
@@ -291,17 +273,10 @@ mwss.on('connection', function connection(ws, req) {
         console.log('Connection M'/* + sessionId  */+' closed');
         ffchild.stdin.end();
         //stop(sessionId);
-        //wavf.end();
     });
 
     ws.on('message', function (message) {
         var a = Buffer.from(message);
-        //wavf.write(message.binaryData);
-        //for(var i = 0; i < a.length ;i++){
-        //console.log(a.readFloatLE(0), a.readFloatLE(4));
-          
-          
-        //}
         //ffchild.stdin.write(a); 
         //console.log(a.length);   
         //console.log(a[0],a[1]);  
@@ -309,8 +284,6 @@ mwss.on('connection', function connection(ws, req) {
 //        console.log(message[1]); 
         //message.pipe(ffchild.stdin);
         ffchild.stdin.write(a); 
-        //console.log('receive message');
-        //console.log(message);
                 
   });
 });//////////////
@@ -333,14 +306,6 @@ function parse_stream(href) {
     ffprbproc.on('close', function(code){
         console.log('code '+code);
     });
-    /*ffprbproc.stdout.on('data', function (data) {
-        console.log(' '+data);
-        //var joutput = JSON.parse(data);
-        //console.log('json',joutput);
-    });
-    ffprbproc.stderr.on('data', function (data) {
-        console.log('ffprobe stderr '+data);
-    });*/
 }
 
 app.use(express.static(path.join(__dirname, 'static')));

@@ -14,22 +14,22 @@
  *
  */
 
-
+MA_VERSION = '1';
+MI_VERSION = '0';
 
 var ws = new WebSocket('wss://' + window.location.host + '/mbs');
-var msclient = new WebSocket('wss://' + window.location.host + '/mbsmedia');
-msclient.binaryType = 'arraybuffer';
+var msclient;// = new WebSocket('wss://' + window.location.host + '/mbsmedia');
+//msclient.binaryType = 'arraybuffer';
 
 var state = null;
 var ipFromHtml = "127.0.0.1";
 var btn;
 var consol;
+var videourl = 'https://motorsporttv.pc.cdn.bitgravity.com/live/ExtContent/moto3/MotoHLS/moto3.m3u8';
 
 const I_CAN_START = 0;
 const I_CAN_STOP = 1;
 const I_AM_STARTING = 2;
-
-//ws.binaryType = 'arraybuffer';
 
 window.onload = function () {
 	consol = new Console();
@@ -39,7 +39,8 @@ window.onload = function () {
 
 window.onbeforeunload = function () {
 	ws.close();
-        msclient.close(); 
+        if( msclient )
+           msclient.close(); 
 }
 
 ws.onmessage = function (message) {
@@ -73,13 +74,47 @@ ws.onmessage = function (message) {
                             p.insertAdjacentHTML('beforeend', '<label for="stream'+i+'">  '+label+'</label>');
                             div.appendChild(p);    
                         }
+                        document.getElementById("btnAir").disabled = false;
 			break;
                 case 'ffprobe_error':
                         consol.log(parsedMessage.message);
                         break;
 		case 'ffmpeg':
-			console.log('From ffmpeg:', parsedMessage.message);
-			break;
+		    console.log('From ffmpeg:', parsedMessage.message);
+		    break;
+                case 'hls_stream':
+                    if (parsedMessage.message == 'configured') {
+                        if (msclient) 
+                        	msclient.close();
+                        msclient = new WebSocket('wss://' + window.location.host + '/mbsmedia');
+                        msclient.binaryType = 'arraybuffer';
+                    
+                      msclient.addEventListener('open', function (event) {
+                        navigator.getUserMedia = navigator.getUserMedia || 
+                             navigator.webkitGetUserMedia || 
+                             navigator.mozGetUserMedia || 
+                             navigator.msGetUserMedia;
+                        navigator.mediaDevices.getUserMedia( {"audio":true} )
+                        .then( function(stream) {
+                           var lclAContext = window.AudioContext;
+                           var acontext = new lclAContext();
+                           var audioInput = acontext.createMediaStreamSource(stream);
+                           var bufferSize = 2048;       
+                           var recorder = acontext.createScriptProcessor(bufferSize, 1, 1);
+                           recorder.onaudioprocess = recorderProcess;
+                           audioInput.connect(recorder);
+                           recorder.connect(acontext.destination);
+                           function recorderProcess(ev) {
+                               var left = ev.inputBuffer.getChannelData(0);
+                               msclient.send(left);
+                           } 
+                        }) 
+                        .catch( function (err){
+                            window.console.log('failed '+ err.message);
+                        }); // navigator.
+                      });
+                    }
+                    break; 
 		default:
 			if (state == I_AM_STARTING) {
 				setState(I_CAN_START);
@@ -88,66 +123,15 @@ ws.onmessage = function (message) {
 	}
 }
 
-//ws_media.onmessage = function (message) {
-//        console.info('client media Received message: ' + message.data);
-//}
-
-msclient.addEventListener('open', function (event) {
-      //consol.log('msclient open');
-      function convertFloat32ToInt16(buffer) {
-        l = buffer.length;
-        buf = new Int16Array(l);
-        while (l--) {
-           buf[l] = Math.min(1, buffer[l])*0x7FFF;
-        }
-        return buf.buffer;
-      }   
-      navigator.getUserMedia = navigator.getUserMedia || 
-                             navigator.webkitGetUserMedia || 
-                             navigator.mozGetUserMedia || 
-                             navigator.msGetUserMedia;
-      navigator.mediaDevices.getUserMedia( {"audio":true} )
-            .then( function(stream) {
-                       var lclAContext = window.AudioContext;
-                       var acontext = new lclAContext();
-                       var audioInput = acontext.createMediaStreamSource(stream);
-                       var bufferSize = 2048;       
-                       var recorder = acontext.createScriptProcessor(bufferSize, 1, 1);
-                       recorder.onaudioprocess = recorderProcess;
-                       audioInput.connect(recorder);
-                       recorder.connect(acontext.destination);
-                       function recorderProcess(ev) {
-                           var left = ev.inputBuffer.getChannelData(0);
-                           //var data = convertFloat32ToInt16(left);
-                           //consol.log(left[0],left[1]);
-                           
-                           //if ( left[0] >= 0){
-                           //consol.log(left.length);
-                           //}else{
-                           // consol.log((~left[0]).toString(16));
-                           //}
-                           //if ( left[1] >= 0){
-                           // consol.log(left[1].toString(16));
-                           //}else{
-                           // consol.log((~left[1]).toString(16));
-                          // }
-                           
-                           msclient.send(left);
-                           
-                       } 
-      }) 
-           .catch( function (err){
-           window.console.log('failed '+ err.message);
-      }); // navigator.
-        
-});
 
 
 function hlsplayer() {
     var inVideo = document.getElementById('inVideo');
+    var streamUrlFld = document.getElementById("strUrl");
+    streamUrlFld.value = videourl;
     if(Hls.isSupported()) {
         var hls = new Hls();
-        hls.loadSource('https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8');
+        hls.loadSource(videourl);
         //inVideo.src = 'http://devimages.apple.com/iphone/samples/bipbop/bipbopall.m3u8';
         hls.attachMedia(inVideo);
         videoInput = inVideo;
@@ -172,18 +156,6 @@ function captureLclMedia() {
     var curBtnColor = defBtnColor; 
     //ipFromHtml = txtFld.value;
     var clicked = false;
-    
-
-
-    //var signalingChannel = createSignalingChannel();
-//    srv = new RTCPeerConnection();
-//    srv.onaddstream = function (evt) {
-//        remoteView.srcObject = evt.stream;
-//    };
-//    srv.ontrack = function() {
-//        consol.log('ontrack');
-//    }
-
 
   
 /* var streamFunc = function(localMediaStream) {
@@ -201,18 +173,6 @@ function captureLclMedia() {
                fr.readAsArrayBuffer(sample.data, function(e) {
                  console.log(e);
                });
-               var chunks = fr.result;  
-                                                   //chunks.push(sample.data);
-                                                   console.log(mediaRecorder.mimeType);
-                                                   sample.data.type = mediaRecorder.mimeType;
-                                                   console.log('blob size '+sample.data.size);
-                                                   //console.log('chunks size '+chunks.lenght);
-                                                   //var bytes = new Uint8Array(chunks,'binary');
-                                                   //console.log('u8a len '+bytes.byteLength);
-                                                   //ws_media.send(bytes);
-               
-                                                   //var data = new Uint8Array(sample.data, 'binary');
-                                                   ws_media.send(sample.data);
                                                    
                                                     
                                                    //ws.send(JSON.stringify(message));  
@@ -236,13 +196,38 @@ function captureLclMedia() {
 
    btn.addEventListener("click", function(e) {
                                       if (!clicked) {
+                                          var div = document.getElementById('streams');
+                                          var chp = div.firstChild;
+                                          var chbox = chp.firstChild;
+                                          var checked;
+                                          var strm;
+                                          var message = {
+                                              id: 'hls_stream',
+                                              streamurl: streamUrlFld.value,
+                                              streams: []
+                                          };
+                                          while (chp!=null) {
+
+                                              if( chbox.checked == true ){
+                                                  message.streams.push(true);
+                                              } else {
+                                                  message.streams.push(false);
+                                              }
+                                              chp = chp.nextSibling;
+                                              if (chp == null)
+                                                  break;
+                                              chbox = chp.firstChild;
+                                          }
+                                          
+                                          sendMessage(message);                                          
                                           clicked = true;
                                           btn.style.backgroundColor="#FF0000";
                                           btn.innerHTML = "ON AIR";
                                           consol.log("Capture started");
-                                          //mediaRecorder.start(5000);
 
                                       } else {
+                                          if( msclient )
+                                              msclient.close();
                                           btn.style.backgroundColor=defBtnColor;
                                           btn.innerHTML = " AIR ";
                                           clicked = false;  
@@ -259,10 +244,6 @@ function onError(error) {
 	consol.error(error);
 }
 
-function startResponse(message) {
-	setState(I_CAN_STOP);
-	consol.log('SDP answer received from server. Processing ...');
-}
 
 function stop() {
 	consol.log('Stopping ...');
@@ -304,6 +285,16 @@ function stop() {
 	state = nextState;
 }*/
 
+function convertFloat32ToInt16(buffer) {
+   l = buffer.length;
+   buf = new Int16Array(l);
+   while (l--) {
+        buf[l] = Math.min(1, buffer[l])*0x7FFF;
+    }
+    return buf.buffer;
+}   
+
+
 function sendMessage(message) {
 	var jsonMessage = JSON.stringify(message);
 	consol.log('Client Senging message: ' + jsonMessage);
@@ -317,4 +308,6 @@ $(document).delegate('*[data-toggle="lightbox"]', 'click', function (event) {
 	$(this).ekkoLightbox();
 });
 
-
+function version() {
+	document.write(MA_VERSION+'.'+MI_VERSION);
+}

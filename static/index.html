@@ -25,7 +25,10 @@
   <script src="https://cdn.jsdelivr.net/npm/hls.js@canary"></script>
   <!--script src="/js/swfobject.min.js"></script-->
   <script src="js/index.js"></script>
-  <title>MBS v0.3</title>
+  <script>
+      document.write('<title>MBS v'+MA_VERSION+'.'+MI_VERSION+'</title>')
+  </script>
+  <title>MBS v</title>
 </head>
 
 <body>
@@ -51,26 +54,27 @@
 
   <div class="container">
     <div class="page-header">
-      <h1>MBS v0.3</h1>
+      <script>
+          document.write('<h1>MBS v'+MA_VERSION+'.'+MI_VERSION+'</h1>')
+      </script>
     </div>
     <div class="row">
       <div class="col-md-6">
         <h3>Processing Stream</h3>
         <!--video id="videoInput" autoplay width="480px" height="360px" poster="img/webrtc.png"></video-->
         <!--video controls id="inVideo" width="480px" height="360px"></video-->
-        <video id="inVideo" width="480px" height="360px"></video>
+        <video controls id="inVideo" width="480px" height="360px"></video>
         <script>
-          hlsplayer()
+          //hlsplayer()
         </script>
       </div>
       <div class="col-md-10">
          <p>URL: <input id="strUrl" type="text" size=50> <button id="btnUrl"> Probe </button></p>
       </div> 
       <div class="col-md-10">
-        <button id="btnAir" > AIR </button>
-        <script>
-            captureLclMedia()
-        </script> 
+        <button id="btnAir" disabled> AIR </button>
+        <script>hlsplayer()</script>
+        <script>captureLclMedia()</script> 
         <!--a id="start" href="#" class="btn btn-success">
           <span class="glyphicon glyphicon-play"></span> Start</a>
         <a id="stop" href="#" class="btn btn-danger">
